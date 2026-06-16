@@ -1,0 +1,224 @@
+{% extends 'base.html' %}
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Good morning, <em>Doctor</em></h1>
+    <p class="page-sub" id="today-date">Loading…</p>
+  </div>
+  <div style="display:flex; gap:0.75rem;">
+    <button class="btn-ghost" onclick="openModal('change-password-modal')">🔑 Change Password</button>
+    <button class="btn-primary" onclick="openAddPatient()">+ New Patient</button>
+  </div>
+</div>
+  <!-- <button class="btn-primary" onclick="openAddPatient()">+ New Patient</button>
+</div> -->
+
+<!-- Stat Cards -->
+<div class="stats-grid">
+  <div class="stat-card stat-blue">
+    <div class="stat-icon">👥</div>
+    <div class="stat-value" id="s-patients">—</div>
+    <div class="stat-label">Today's Patients</div>
+  </div>
+  <div class="stat-card stat-green">
+    <div class="stat-icon">₹</div>
+    <div class="stat-value" id="s-revenue">—</div>
+    <div class="stat-label">Today's Revenue</div>
+  </div>
+  <div class="stat-card stat-red">
+    <div class="stat-icon">⚠</div>
+    <div class="stat-value" id="s-due">—</div>
+    <div class="stat-label">Today's Pending Dues</div>
+  </div>
+  <div class="stat-card stat-amber">
+    <div class="stat-icon">📋</div>
+    <div class="stat-value" id="s-today">—</div>
+    <div class="stat-label">Today's Visits</div>
+  </div>
+</div>
+<!-- Today's Patients -->
+<section class="section">
+  <div class="section-header">
+    <h2 class="section-title">Today's Patients</h2>
+    <a href="/patients" class="link-muted">View all patients →</a>
+  </div>
+  <div class="table-wrap">
+    <table class="data-table" id="today-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Patient</th>
+          <th>Phone</th>
+          <th>Billed</th>
+          <th>Paid</th>
+          <th>Due</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody id="today-body">
+        <tr><td colspan="7" class="loading-row">Loading…</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- Add Patient Modal -->
+<div id="add-patient-modal" class="modal hidden">
+  <div class="modal-header">
+    <h3 class="modal-title">Register New Patient</h3>
+    <button class="modal-close" onclick="closeModal('add-patient-modal')">✕</button>
+  </div>
+  <div class="modal-body">
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">First Name *</label>
+        <input id="ap-fname" class="form-input" placeholder="John" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Last Name *</label>
+        <input id="ap-lname" class="form-input" placeholder="Doe" />
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Age *</label>
+        <input id="ap-age" class="form-input" type="number" min="0" max="150" placeholder="35" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Gender *</label>
+        <select id="ap-gender" class="form-input">
+          <option value="">Select…</option>
+          <option>Male</option>
+          <option>Female</option>
+          <option>Other</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Phone</label>
+      <input id="ap-phone" class="form-input" placeholder="+91 98765 43210" />
+    </div>
+    <div class="form-group">
+      <label class="form-label">Address</label>
+      <textarea id="ap-address" class="form-input" rows="2" placeholder="Street, City…"></textarea>
+    </div>
+  </div>
+  <div class="modal-footer">
+    <button class="btn-ghost" onclick="closeModal('add-patient-modal')">Cancel</button>
+    <button class="btn-primary" onclick="submitAddPatient()">Register Patient</button>
+  </div>
+</div>
+
+<!-- Change Password Modal -->
+<div id="change-password-modal" class="modal hidden">
+  <div class="modal-header">
+    <h3 class="modal-title">Change Password</h3>
+    <button class="modal-close" onclick="closeModal('change-password-modal')">✕</button>
+  </div>
+  <div class="modal-body">
+    <div class="form-group">
+      <label class="form-label">Current Password *</label>
+      <input id="cp-current" type="password" class="form-input" placeholder="••••••••" />
+    </div>
+    <div class="form-group">
+      <label class="form-label">New Password *</label>
+      <input id="cp-new" type="password" class="form-input" placeholder="Min. 6 characters" />
+    </div>
+    <div class="form-group">
+      <label class="form-label">Confirm New Password *</label>
+      <input id="cp-confirm" type="password" class="form-input" placeholder="Repeat new password" />
+    </div>
+  </div>
+  <div class="modal-footer">
+    <button class="btn-ghost" onclick="closeModal('change-password-modal')">Cancel</button>
+    <button class="btn-primary" onclick="submitChangePassword()">Update Password</button>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('today-date').textContent = new Date().toLocaleDateString('en-IN', {
+  weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+});
+
+async function loadStats() {
+  const data = await api('/api/stats');
+  const patients = await api('/api/patients/today');
+  document.getElementById('s-patients').textContent = patients.length;
+  document.getElementById('s-revenue').textContent  = '₹' + fmt(data.today_revenue);
+  document.getElementById('s-due').textContent      = '₹' + fmt(data.today_due);
+  document.getElementById('s-today').textContent    = data.today_visits;
+}
+
+async function loadTodayPatients() {
+  const rows = await api('/api/patients/today');
+  const tbody = document.getElementById('today-body');
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="7" class="empty-row">No patients visited today yet 🏥</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map((r, i) => `
+    <tr class="${r.total_due > 0 ? 'row-due' : ''}">
+      <td class="text-muted">${i + 1}</td>
+      <td><a href="/patient/${r.id}" class="patient-link">${r.first_name} ${r.last_name}</a></td>
+      <td>${r.phone || '—'}</td>
+      <td>₹${fmt(r.total_billed)}</td>
+      <td>₹${fmt(r.total_paid)}</td>
+      <td>${r.total_due > 0
+        ? `<span class="badge-due">₹${fmt(r.total_due)}</span>`
+        : '<span class="badge-clear">Cleared</span>'
+      }</td>
+      <td><a href="/patient/${r.id}" class="btn-sm">View</a></td>
+    </tr>
+  `).join('');
+}
+
+function openAddPatient() { openModal('add-patient-modal'); }
+
+async function submitAddPatient() {
+  const body = {
+    first_name: v('ap-fname'), last_name: v('ap-lname'),
+    age: v('ap-age'), gender: v('ap-gender'),
+    phone: v('ap-phone'), address: v('ap-address')
+  };
+  if (!body.first_name || !body.last_name || !body.age || !body.gender) {
+    toast('Fill in required fields.', 'error'); return;
+  }
+  const res = await api('/api/patients', 'POST', body);
+  if (res.id) {
+    toast('Patient registered!', 'success');
+    closeModal('add-patient-modal');
+    loadStats();
+    loadTodayPatients();
+    setTimeout(() => window.location.href = '/patient/' + res.id, 800);
+  }
+}
+
+async function submitChangePassword() {
+  const body = {
+    current_password: document.getElementById('cp-current').value,
+    new_password:     document.getElementById('cp-new').value,
+    confirm_password: document.getElementById('cp-confirm').value,
+  };
+  if (!body.current_password || !body.new_password || !body.confirm_password) {
+    toast('Please fill in all fields.', 'error'); return;
+  }
+  const res = await api('/api/change-password', 'POST', body);
+  if (res.success) {
+    toast('Password changed successfully!', 'success');
+    closeModal('change-password-modal');
+    document.getElementById('cp-current').value = '';
+    document.getElementById('cp-new').value = '';
+    document.getElementById('cp-confirm').value = '';
+  } else {
+    toast(res.message || 'Failed to change password.', 'error');
+  }
+}
+
+loadStats();
+loadTodayPatients();
+</script>
+{% endblock %}

@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MediTrack — Login</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/css/main.css" />
+</head>
+<body class="login-body">
+
+  <div class="login-wrapper">
+    <div class="login-art">
+      <div class="art-rings">
+        <div class="ring ring-1"></div>
+        <div class="ring ring-2"></div>
+        <div class="ring ring-3"></div>
+      </div>
+      <div class="art-content">
+        <div class="art-icon">✦</div>
+        <h1 class="art-title">MediTrack</h1>
+        <p class="art-sub">Clinic Management System</p>
+        <div class="art-pills">
+          <span class="pill">Patients</span>
+          <span class="pill">Records</span>
+          <span class="pill">Payments</span>
+          <span class="pill">Reports</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="login-form-side">
+      <div class="login-card">
+        <h2 class="login-heading">Welcome back,<br /><em>Doctor</em></h2>
+        <p class="login-sub">Sign in to access your clinic dashboard</p>
+
+        {% if error %}
+        <div class="alert alert-error">{{ error }}</div>
+        {% endif %}
+
+        <div id="login-error" class="alert alert-error hidden"></div>
+
+        <div class="form-group">
+          <label class="form-label">Username</label>
+          <input id="username" type="text" class="form-input" placeholder="admin" autocomplete="username" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Password</label>
+          <input id="password" type="password" class="form-input" placeholder="••••••••" autocomplete="current-password" />
+        </div>
+        <button id="login-btn" class="btn-primary btn-full">Sign In →</button>
+
+        <!-- <p class="login-hint">Default: <code>admin</code> / <code>clinic123</code></p> -->
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/js/app.js"></script>
+  <script>
+    const btn = document.getElementById('login-btn');
+    const errEl = document.getElementById('login-error');
+
+    async function doLogin() {
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value;
+      if (!username || !password) { showErr('Please fill in all fields.'); return; }
+      btn.textContent = 'Signing in…';
+      btn.disabled = true;
+      try {
+        const res = await fetch('/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+        const data = await res.json();
+        if (data.success) { window.location.href = '/dashboard'; }
+        else { showErr(data.message || 'Invalid credentials'); btn.textContent = 'Sign In →'; btn.disabled = false; }
+      } catch(e) { showErr('Connection error.'); btn.textContent = 'Sign In →'; btn.disabled = false; }
+    }
+
+    function showErr(msg) {
+      errEl.textContent = msg;
+      errEl.classList.remove('hidden');
+    }
+
+    btn.addEventListener('click', doLogin);
+    document.addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+  </script>
+</body>
+</html>

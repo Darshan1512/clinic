@@ -1,0 +1,203 @@
+{% extends 'base.html' %}
+{% block title %}Patients{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Patient Registry</h1>
+    <p class="page-sub" id="view-sub">Showing today's visitors</p>
+  </div>
+  <div style="display:flex; gap:0.75rem; align-items:center;">
+    <button class="btn-primary" id="btn-today" onclick="switchView('today')">Today's Patients</button>
+    <button class="btn-ghost"   id="btn-all"   onclick="switchView('all')">All Patients</button>
+    <button class="btn-primary" onclick="openAddPatient()">+ New Patient</button>
+  </div>
+</div>
+
+<!-- Search Bar -->
+<div class="search-bar-wrap">
+  <div class="search-bar">
+    <span class="search-icon">⌕</span>
+    <input id="search-input" class="search-input" type="text" placeholder="Search by first or last name…" oninput="doSearch()" />
+    <button class="search-clear hidden" id="search-clear" onclick="clearSearch()">✕</button>
+  </div>
+  <div class="search-meta" id="search-meta"></div>
+</div>
+
+<!-- Patients Table -->
+<div class="section">
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+  <tr>
+    <th>ID</th>
+    <th>Patient</th>
+    <th>Age / Gender</th>
+    <th>Phone</th>
+    <th>Visits</th>
+    <th>Billed</th>
+    <th>Paid</th>
+    <th>Due</th>
+    <th>Action</th>
+  </tr>
+</thead>
+      <tbody id="patients-body">
+        <tr><td colspan="9" class="loading-row">Loading patients…</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Add Patient Modal -->
+<div id="add-patient-modal" class="modal hidden">
+  <div class="modal-header">
+    <h3 class="modal-title">Register New Patient</h3>
+    <button class="modal-close" onclick="closeModal('add-patient-modal')">✕</button>
+  </div>
+  <div class="modal-body">
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">First Name *</label>
+        <input id="ap-fname" class="form-input" placeholder="John" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Last Name *</label>
+        <input id="ap-lname" class="form-input" placeholder="Doe" />
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Age *</label>
+        <input id="ap-age" class="form-input" type="number" min="0" max="150" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Gender *</label>
+        <select id="ap-gender" class="form-input">
+          <option value="">Select…</option>
+          <option>Male</option>
+          <option>Female</option>
+          <option>Other</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Phone</label>
+      <input id="ap-phone" class="form-input" placeholder="+91 98765 43210" />
+    </div>
+    <div class="form-group">
+      <label class="form-label">Address</label>
+      <textarea id="ap-address" class="form-input" rows="2" placeholder="Street, City…"></textarea>
+    </div>
+  </div>
+  <div class="modal-footer">
+    <button class="btn-ghost" onclick="closeModal('add-patient-modal')">Cancel</button>
+    <button class="btn-primary" onclick="submitAddPatient()">Register Patient</button>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+let searchTimer;
+let currentView = 'today';
+
+async function loadPatients(query = '') {
+  let url;
+  if (query) {
+    url = `/api/patients?search=${encodeURIComponent(query)}`;
+  } else if (currentView === 'today') {
+    url = '/api/patients/today';
+  } else {
+    url = '/api/patients';
+  }
+
+  const rows = await api(url);
+  const meta = document.getElementById('search-meta');
+
+  if (query) {
+    meta.textContent = `${rows.length} result${rows.length !== 1 ? 's' : ''} for "${query}"`;
+  } else if (currentView === 'today') {
+    meta.textContent = `${rows.length} patient${rows.length !== 1 ? 's' : ''} visited today`;
+  } else {
+    meta.textContent = `${rows.length} total patients registered`;
+  }
+
+  const tbody = document.getElementById('patients-body');
+  if (!rows.length) {
+    const msg = currentView === 'today' ? 'No patients have visited today yet' : 'No patients found';
+    tbody.innerHTML = `<tr><td colspan="9" class="empty-row">${msg}</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = rows.map(r => `
+    <tr class="${r.total_due > 0 ? 'row-due' : ''}">
+      <td><span class="id-badge">#${r.id}</span></td>
+      <td><a href="/patient/${r.id}" class="patient-link">${r.first_name} ${r.last_name}</a></td>
+      <td>${r.age} / ${r.gender}</td>
+      <td>${r.phone || '—'}</td>
+      <td class="text-center">${r.visit_count}</td>
+      <td>₹${fmt(r.total_billed)}</td>
+      <td>₹${fmt(r.total_paid)}</td>
+      <td>${r.total_due > 0
+        ? `<span class="badge-due">₹${fmt(r.total_due)}</span>`
+        : '<span class="badge-clear">Cleared</span>'
+      }</td>
+      <td>
+        <a href="/patient/${r.id}" class="btn-sm">View</a>
+        <button class="btn-sm btn-sm-del" onclick="deletePatient(${r.id}, '${r.first_name} ${r.last_name}')">Del</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function switchView(view) {
+  currentView = view;
+  document.getElementById('view-sub').textContent =
+    view === 'today' ? "Showing today's visitors" : 'Showing all registered patients';
+  document.getElementById('btn-today').className = view === 'today' ? 'btn-primary' : 'btn-ghost';
+  document.getElementById('btn-all').className   = view === 'all'   ? 'btn-primary' : 'btn-ghost';
+  document.getElementById('search-input').value = '';
+  document.getElementById('search-clear').classList.add('hidden');
+  loadPatients();
+}
+
+function doSearch() {
+  const q = document.getElementById('search-input').value.trim();
+  document.getElementById('search-clear').classList.toggle('hidden', !q);
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => loadPatients(q), 300);
+}
+
+function clearSearch() {
+  document.getElementById('search-input').value = '';
+  document.getElementById('search-clear').classList.add('hidden');
+  loadPatients();
+}
+
+async function deletePatient(id, name) {
+  if (!confirm(`Delete patient "${name}" and all their records? This cannot be undone.`)) return;
+  const res = await api(`/api/patients/${id}`, 'DELETE');
+  if (res.success) { toast('Patient deleted.', 'success'); loadPatients(); }
+}
+
+function openAddPatient() { openModal('add-patient-modal'); }
+
+async function submitAddPatient() {
+  const body = {
+    first_name: v('ap-fname'), last_name: v('ap-lname'),
+    age: v('ap-age'), gender: v('ap-gender'),
+    phone: v('ap-phone'), address: v('ap-address')
+  };
+  if (!body.first_name || !body.last_name || !body.age || !body.gender) {
+    toast('Fill in required fields.', 'error'); return;
+  }
+  const res = await api('/api/patients', 'POST', body);
+  if (res.id) {
+    toast('Patient registered!', 'success');
+    closeModal('add-patient-modal');
+    setTimeout(() => window.location.href = '/patient/' + res.id, 600);
+  }
+}
+
+loadPatients();
+</script>
+{% endblock %}

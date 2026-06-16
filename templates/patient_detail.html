@@ -1,0 +1,376 @@
+{% extends 'base.html' %}
+{% block title %}Patient Detail{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <a href="/patients" class="back-link">← All Patients</a>
+    <h1 class="page-title" id="patient-name">Loading…</h1>
+    <p class="page-sub" id="patient-meta"></p>
+  </div>
+  <div class="header-actions">
+    <button class="btn-ghost" onclick="openEditPatient()">Edit Info</button>
+    <button class="btn-primary" onclick="openAddVisit()">+ Add Visit</button>
+  </div>
+</div>
+
+<!-- Patient Summary Cards -->
+<div class="patient-summary" id="patient-summary">
+  <div class="summary-card">
+    <span class="summary-label">Patient ID</span>
+    <span class="summary-val" id="ps-id">—</span>
+  </div>
+  <div class="summary-card">
+    <span class="summary-label">Phone</span>
+    <span class="summary-val" id="ps-phone">—</span>
+  </div>
+  <div class="summary-card">
+    <span class="summary-label">Total Billed</span>
+    <span class="summary-val" id="ps-billed">—</span>
+  </div>
+  <div class="summary-card">
+    <span class="summary-label">Total Paid</span>
+    <span class="summary-val" id="ps-paid">—</span>
+  </div>
+  <div class="summary-card" id="ps-due-card">
+    <span class="summary-label">Pending Due</span>
+    <span class="summary-val" id="ps-due">—</span>
+  </div>
+  <div class="summary-card">
+    <span class="summary-label">Total Visits</span>
+    <span class="summary-val" id="ps-visits">—</span>
+  </div>
+</div>
+
+<!-- Visits History -->
+<section class="section">
+  <div class="section-header">
+    <h2 class="section-title">Visit History</h2>
+  </div>
+  <div id="visits-list">
+    <div class="loading-row">Loading visits…</div>
+  </div>
+</section>
+
+<!-- Edit Patient Modal -->
+<div id="edit-patient-modal" class="modal hidden">
+  <div class="modal-header">
+    <h3 class="modal-title">Edit Patient Info</h3>
+    <button class="modal-close" onclick="closeModal('edit-patient-modal')">✕</button>
+  </div>
+  <div class="modal-body">
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">First Name *</label>
+        <input id="ep-fname" class="form-input" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Last Name *</label>
+        <input id="ep-lname" class="form-input" />
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Age *</label>
+        <input id="ep-age" class="form-input" type="number" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Gender *</label>
+        <select id="ep-gender" class="form-input">
+          <option>Male</option>
+          <option>Female</option>
+          <option>Other</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Phone</label>
+      <input id="ep-phone" class="form-input" />
+    </div>
+    <div class="form-group">
+      <label class="form-label">Address</label>
+      <textarea id="ep-address" class="form-input" rows="2"></textarea>
+    </div>
+  </div>
+  <div class="modal-footer">
+    <button class="btn-ghost" onclick="closeModal('edit-patient-modal')">Cancel</button>
+    <button class="btn-primary" onclick="submitEditPatient()">Save Changes</button>
+  </div>
+</div>
+
+<!-- Add Visit Modal -->
+<div id="add-visit-modal" class="modal hidden">
+  <div class="modal-header">
+    <h3 class="modal-title">Record New Visit</h3>
+    <button class="modal-close" onclick="closeModal('add-visit-modal')">✕</button>
+  </div>
+  <div class="modal-body">
+    <div class="form-group">
+      <label class="form-label">Visit Date</label>
+      <input id="av-date" class="form-input" type="date" />
+    </div>
+    <div class="form-group">
+      <label class="form-label">Complaint</label>
+      <textarea id="av-complaint" class="form-input" rows="2" placeholder="Patient's reported symptoms…"></textarea>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Diagnosis</label>
+      <textarea id="av-diagnosis" class="form-input" rows="2" placeholder="Doctor's findings…"></textarea>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Treatment / Prescription</label>
+      <textarea id="av-treatment" class="form-input" rows="2" placeholder="Medicines, advice…"></textarea>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Total Fee (₹)</label>
+        <input id="av-total" class="form-input" type="number" min="0" step="0.01" placeholder="500" oninput="calcDue()" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Paid Amount (₹)</label>
+        <input id="av-paid" class="form-input" type="number" min="0" step="0.01" placeholder="500" oninput="calcDue()" />
+      </div>
+    </div>
+    <div class="due-preview" id="due-preview" style="display:none">
+      <span class="due-label">Remaining Due:</span>
+      <span class="due-amount" id="due-preview-val">₹0</span>
+    </div>
+  </div>
+  <div class="modal-footer">
+    <button class="btn-ghost" onclick="closeModal('add-visit-modal')">Cancel</button>
+    <button class="btn-primary" onclick="submitAddVisit()">Save Visit</button>
+  </div>
+</div>
+
+<!-- Edit Visit Modal -->
+<div id="edit-visit-modal" class="modal hidden">
+  <div class="modal-header">
+    <h3 class="modal-title">Edit Visit Record</h3>
+    <button class="modal-close" onclick="closeModal('edit-visit-modal')">✕</button>
+  </div>
+  <div class="modal-body">
+    <input type="hidden" id="ev-id" />
+    <div class="form-group">
+      <label class="form-label">Visit Date</label>
+      <input id="ev-date" class="form-input" type="date" />
+    </div>
+    <div class="form-group">
+      <label class="form-label">Complaint</label>
+      <textarea id="ev-complaint" class="form-input" rows="2"></textarea>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Diagnosis</label>
+      <textarea id="ev-diagnosis" class="form-input" rows="2"></textarea>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Treatment / Prescription</label>
+      <textarea id="ev-treatment" class="form-input" rows="2"></textarea>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Total Fee (₹)</label>
+        <input id="ev-total" class="form-input" type="number" min="0" step="0.01" oninput="calcDueEdit()" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Paid Amount (₹)</label>
+        <input id="ev-paid" class="form-input" type="number" min="0" step="0.01" oninput="calcDueEdit()" />
+      </div>
+    </div>
+    <div class="due-preview" id="due-preview-edit">
+      <span class="due-label">Remaining Due:</span>
+      <span class="due-amount" id="due-preview-edit-val">₹0</span>
+    </div>
+  </div>
+  <div class="modal-footer">
+    <button class="btn-ghost" onclick="closeModal('edit-visit-modal')">Cancel</button>
+    <button class="btn-primary" onclick="submitEditVisit()">Update Visit</button>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const PID = {{ patient_id }};
+let patientData = null;
+
+async function loadPatient() {
+  patientData = await api(`/api/patients/${PID}`);
+  document.getElementById('patient-name').textContent = patientData.first_name + ' ' + patientData.last_name;
+  document.getElementById('patient-meta').textContent = `${patientData.age} yrs · ${patientData.gender} · Registered ${patientData.created_at}`;
+  document.getElementById('ps-id').textContent    = '#' + patientData.id;
+  document.getElementById('ps-phone').textContent = patientData.phone || '—';
+  document.getElementById('ps-billed').textContent = '₹' + fmt(patientData.total_billed);
+  document.getElementById('ps-paid').textContent   = '₹' + fmt(patientData.total_paid);
+  document.getElementById('ps-visits').textContent  = patientData.visit_count;
+  const dueEl = document.getElementById('ps-due');
+  dueEl.textContent = '₹' + fmt(patientData.total_due);
+  if (patientData.total_due > 0) {
+    document.getElementById('ps-due-card').classList.add('due-highlight');
+    dueEl.classList.add('text-red');
+  }
+}
+
+async function loadVisits() {
+  const visits = await api(`/api/patients/${PID}/visits`);
+  const container = document.getElementById('visits-list');
+  if (!visits.length) {
+    container.innerHTML = '<div class="empty-box">No visits recorded yet. Click "Add Visit" to begin.</div>';
+    return;
+  }
+  container.innerHTML = visits.map((v, i) => `
+    <div class="visit-card ${v.due_amount > 0 ? 'visit-card-due' : ''}">
+      <div class="visit-card-head">
+        <div class="visit-num">Visit #${visits.length - i}</div>
+        <div class="visit-date">📅 ${v.visit_date}</div>
+        <div class="visit-actions">
+          <button class="btn-sm" onclick='openEditVisit(${JSON.stringify(v)})'>Edit</button>
+          <button class="btn-sm btn-sm-del" onclick="deleteVisit(${v.id})">Delete</button>
+        </div>
+      </div>
+      <div class="visit-grid">
+        <div class="visit-field">
+          <span class="vf-label">Complaint</span>
+          <span class="vf-val">${v.complaint || '—'}</span>
+        </div>
+        <div class="visit-field">
+          <span class="vf-label">Diagnosis</span>
+          <span class="vf-val">${v.diagnosis || '—'}</span>
+        </div>
+        <div class="visit-field visit-field-full">
+          <span class="vf-label">Treatment / Prescription</span>
+          <span class="vf-val">${v.treatment || '—'}</span>
+        </div>
+      </div>
+      <div class="visit-payment">
+        <div class="pay-item">
+          <span class="pay-label">Total Fee</span>
+          <span class="pay-val">₹${fmt(v.total_amount)}</span>
+        </div>
+        <div class="pay-item">
+          <span class="pay-label">Paid</span>
+          <span class="pay-val text-green">₹${fmt(v.paid_amount)}</span>
+        </div>
+        <div class="pay-item">
+          <span class="pay-label">Due</span>
+          <span class="pay-val ${v.due_amount > 0 ? 'text-red' : 'text-green'}">
+            ${v.due_amount > 0 ? '₹' + fmt(v.due_amount) : 'Cleared ✓'}
+          </span>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+// ── Add Visit ─────────────────────────────────────────────────
+function openAddVisit() {
+  document.getElementById('av-date').value = new Date().toISOString().split('T')[0];
+  document.getElementById('av-complaint').value = '';
+  document.getElementById('av-diagnosis').value = '';
+  document.getElementById('av-treatment').value = '';
+  document.getElementById('av-total').value = '';
+  document.getElementById('av-paid').value = '';
+  document.getElementById('due-preview').style.display = 'none';
+  openModal('add-visit-modal');
+}
+
+function calcDue() {
+  const t = parseFloat(document.getElementById('av-total').value) || 0;
+  const p = parseFloat(document.getElementById('av-paid').value) || 0;
+  const due = t - p;
+  const el = document.getElementById('due-preview');
+  el.style.display = 'flex';
+  document.getElementById('due-preview-val').textContent = '₹' + fmt(due < 0 ? 0 : due);
+  document.getElementById('due-preview-val').className = 'due-amount ' + (due > 0 ? 'text-red' : 'text-green');
+}
+
+async function submitAddVisit() {
+  const body = {
+    visit_date:   v('av-date'),
+    complaint:    v('av-complaint'),
+    diagnosis:    v('av-diagnosis'),
+    treatment:    v('av-treatment'),
+    total_amount: v('av-total') || 0,
+    paid_amount:  v('av-paid') || 0
+  };
+  const res = await api(`/api/patients/${PID}/visits`, 'POST', body);
+  if (res.id) {
+    toast('Visit recorded!', 'success');
+    closeModal('add-visit-modal');
+    loadPatient(); loadVisits();
+  }
+}
+
+// ── Edit Visit ────────────────────────────────────────────────
+function openEditVisit(visit) {
+  document.getElementById('ev-id').value        = visit.id;
+  document.getElementById('ev-date').value      = visit.visit_date;
+  document.getElementById('ev-complaint').value  = visit.complaint  || '';
+  document.getElementById('ev-diagnosis').value  = visit.diagnosis  || '';
+  document.getElementById('ev-treatment').value  = visit.treatment  || '';
+  document.getElementById('ev-total').value      = visit.total_amount;
+  document.getElementById('ev-paid').value       = visit.paid_amount;
+  calcDueEdit();
+  openModal('edit-visit-modal');
+}
+
+function calcDueEdit() {
+  const t = parseFloat(document.getElementById('ev-total').value) || 0;
+  const p = parseFloat(document.getElementById('ev-paid').value) || 0;
+  const due = t - p;
+  document.getElementById('due-preview-edit-val').textContent = '₹' + fmt(due < 0 ? 0 : due);
+  document.getElementById('due-preview-edit-val').className = 'due-amount ' + (due > 0 ? 'text-red' : 'text-green');
+}
+
+async function submitEditVisit() {
+  const id = document.getElementById('ev-id').value;
+  const body = {
+    visit_date:   v('ev-date'),
+    complaint:    v('ev-complaint'),
+    diagnosis:    v('ev-diagnosis'),
+    treatment:    v('ev-treatment'),
+    total_amount: v('ev-total') || 0,
+    paid_amount:  v('ev-paid') || 0
+  };
+  const res = await api(`/api/visits/${id}`, 'PUT', body);
+  if (res.success) {
+    toast('Visit updated!', 'success');
+    closeModal('edit-visit-modal');
+    loadPatient(); loadVisits();
+  }
+}
+
+async function deleteVisit(id) {
+  if (!confirm('Delete this visit record? This cannot be undone.')) return;
+  const res = await api(`/api/visits/${id}`, 'DELETE');
+  if (res.success) { toast('Visit deleted.', 'success'); loadPatient(); loadVisits(); }
+}
+
+// ── Edit Patient ──────────────────────────────────────────────
+function openEditPatient() {
+  document.getElementById('ep-fname').value   = patientData.first_name;
+  document.getElementById('ep-lname').value   = patientData.last_name;
+  document.getElementById('ep-age').value     = patientData.age;
+  document.getElementById('ep-gender').value  = patientData.gender;
+  document.getElementById('ep-phone').value   = patientData.phone || '';
+  document.getElementById('ep-address').value = patientData.address || '';
+  openModal('edit-patient-modal');
+}
+
+async function submitEditPatient() {
+  const body = {
+    first_name: v('ep-fname'), last_name: v('ep-lname'),
+    age: v('ep-age'), gender: v('ep-gender'),
+    phone: v('ep-phone'), address: v('ep-address')
+  };
+  const res = await api(`/api/patients/${PID}`, 'PUT', body);
+  if (res.success) {
+    toast('Patient info updated!', 'success');
+    closeModal('edit-patient-modal');
+    loadPatient();
+  }
+}
+
+loadPatient();
+loadVisits();
+</script>
+{% endblock %}
